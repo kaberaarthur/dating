@@ -1,0 +1,24 @@
+# Node.js dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Environment variable files
+.env
+
+# Mac system files
+.DS_Store
+
+# npm debug log
+npm-debug.log
+
+# Yarn error log
+yarn-error.log
+
+# VS Code workspace settings (if you use VS Code)
+.vscode/
+
+# Optional: package-lock.json or yarn.lock (only if not using lock files for deterministic builds)
+# package-lock.json
+# yarn.lock
