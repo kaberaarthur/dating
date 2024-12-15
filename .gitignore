@@ -22,3 +22,6 @@ yarn-error.log
 # Optional: package-lock.json or yarn.lock (only if not using lock files for deterministic builds)
 # package-lock.json
 # yarn.lock
+
+
+data.json
