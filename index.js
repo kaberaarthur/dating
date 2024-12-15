@@ -21,7 +21,7 @@ app.use((err, req, res, next) => {
 
 // User Routes
 app.use('/api/users', userRoutes);
-app.use('/api/userProfiles', userProfiles);
+app.use('/api/user-profiles', userProfiles);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {

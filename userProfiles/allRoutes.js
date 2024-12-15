@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Create a new user profile
 router.post('/', authenticateToken, async (req, res) => {
-    const { name, date_of_birth, gender, bio, interests } = req.body;
+    const { name, date_of_birth, gender, bio, reason, interests } = req.body;
     const user_id = req.user.id;  // Get the user ID from the JWT
 
     if (!name || !date_of_birth || !gender) {
@@ -15,10 +15,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
     try {
         const [result] = await db.execute(
-            'INSERT INTO user_profiles (user_id, name, date_of_birth, gender, bio, interests) VALUES (?, ?, ?, ?, ?, ?)',
-            [user_id, name, date_of_birth, gender, bio, JSON.stringify(interests)]
+            'INSERT INTO user_profiles (user_id, name, date_of_birth, gender, bio, reason, interests) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [user_id, name, date_of_birth, gender, bio, reason, JSON.stringify(interests)]
         );
-        res.status(201).json({ id: result.insertId, name, date_of_birth, gender, bio, interests });
+        res.status(201).json({ id: result.insertId, name, date_of_birth, gender, bio, reason, interests });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -28,72 +28,101 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get user profile
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const user_id = req.user.id;
-
-    if (parseInt(id) !== user_id) {
-        return res.status(403).json({ error: 'You can only view your own profile.' });
-    }
+    const user_id = req.user.id;  // Get the user ID from the JWT token
+    const user_type = req.user.user_type;  // Get the user type from the JWT token
 
     try {
-        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE user_id = ?', [user_id]);
+        // Check if the requested profile exists in the user_profiles table
+        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE id = ?', [id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Profile not found' });
         }
+
+        // Check if the user ID from the profile matches the user ID in the token
+        const profileUserId = rows[0].user_id;
+        if (profileUserId !== user_id && user_type !== 'admin' && user_type !== 'superadmin') {
+            return res.status(403).json({ error: 'You are not authorized to view this profile.' });
+        }
+
+        // Return the profile data
         res.status(200).json(rows[0]);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
+    
 });
+
 
 // Update user profile
 router.patch('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { name, date_of_birth, gender, bio, interests } = req.body;
+    const { name, date_of_birth, gender, bio, reason, interests } = req.body;
     const user_id = req.user.id;
-
-    if (parseInt(id) !== user_id) {
-        return res.status(403).json({ error: 'You can only update your own profile.' });
-    }
-
-    const fieldsToUpdate = [];
-    const values = [];
-
-    if (name) {
-        fieldsToUpdate.push('name = ?');
-        values.push(name);
-    }
-    if (date_of_birth) {
-        fieldsToUpdate.push('date_of_birth = ?');
-        values.push(date_of_birth);
-    }
-    if (gender) {
-        fieldsToUpdate.push('gender = ?');
-        values.push(gender);
-    }
-    if (bio) {
-        fieldsToUpdate.push('bio = ?');
-        values.push(bio);
-    }
-    if (interests) {
-        fieldsToUpdate.push('interests = ?');
-        values.push(JSON.stringify(interests));
-    }
-
-    if (fieldsToUpdate.length === 0) {
-        return res.status(400).json({ error: 'No fields to update' });
-    }
+    const user_type = req.user.user_type;
 
     try {
-        const query = `UPDATE user_profiles SET ${fieldsToUpdate.join(', ')} WHERE user_id = ? AND id = ?`;
-        values.push(user_id, id);
-        const [result] = await db.execute(query, values);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Profile not found or not owned by user' });
+        // Check if the requested profile exists in the user_profiles table
+        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE id = ?', [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Profile not found' });
         }
 
-        res.status(200).json({ message: 'Profile updated successfully' });
+        // Check if the user ID from the profile matches the user ID in the token
+        const profileUserId = rows[0].user_id;
+        if (profileUserId !== user_id && user_type !== 'admin' && user_type !== 'superadmin') {
+            return res.status(403).json({ error: 'You are not authorized to edit this profile.' });
+        }
+
+        // Perform the Update Here
+        const fieldsToUpdate = [];
+        const values = [];
+
+        if (name) {
+            fieldsToUpdate.push('name = ?');
+            values.push(name);
+        }
+        if (date_of_birth) {
+            fieldsToUpdate.push('date_of_birth = ?');
+            values.push(date_of_birth);
+        }
+        if (gender) {
+            fieldsToUpdate.push('gender = ?');
+            values.push(gender);
+        }
+        if (bio) {
+            fieldsToUpdate.push('bio = ?');
+            values.push(bio);
+        }
+        if (reason) {
+            fieldsToUpdate.push('reason = ?');
+            values.push(reason);
+        }
+        if (interests) {
+            fieldsToUpdate.push('interests = ?');
+            values.push(JSON.stringify(interests));
+        }
+
+        if (fieldsToUpdate.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        // Perform the Update here
+        try {
+            const query = `UPDATE user_profiles SET ${fieldsToUpdate.join(', ')} WHERE id = ?`;
+            values.push(id);
+            const [result] = await db.execute(query, values);
+    
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Profile not found or not owned by user' });
+            }
+    
+            res.status(200).json({ message: 'Profile updated successfully' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -104,13 +133,26 @@ router.patch('/:id', authenticateToken, async (req, res) => {
 router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const user_id = req.user.id;
-
-    if (parseInt(id) !== user_id) {
-        return res.status(403).json({ error: 'You can only delete your own profile.' });
-    }
+    const user_type = req.user.user_type;
 
     try {
-        const [result] = await db.execute('DELETE FROM user_profiles WHERE id = ? AND user_id = ?', [id, user_id]);
+        // Check if the requested profile exists in the user_profiles table
+        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE id = ?', [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        // Check if the user ID from the profile matches the user ID in the token
+        const profileUserId = rows[0].user_id;
+        if (profileUserId !== user_id && user_type !== 'admin' && user_type !== 'superadmin') {
+            return res.status(403).json({ error: 'You are not authorized to edit this profile.' });
+        }
+
+        // Conduct the delete function
+        const [result] = await db.execute(
+            'DELETE FROM user_profiles WHERE id = ?',
+            [id]
+        );
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Profile not found or not owned by user' });
