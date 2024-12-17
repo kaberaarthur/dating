@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 // Route Imports
 const userRoutes = require('./userRoutes');
 const userProfiles = require('./userProfiles/allRoutes');
+const userImages = require('./userImages/allRoutes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use((err, req, res, next) => {
 // User Routes
 app.use('/api/users', userRoutes);
 app.use('/api/user-profiles', userProfiles);
+app.use('/api/user-images', userImages);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {
