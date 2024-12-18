@@ -33,24 +33,20 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // READ all messages (with optional filters)
 router.get('/', authenticateToken, async (req, res) => {
-    const { sender_id, receiver_id, is_read, page = 1, limit = 10 } = req.query;
+    const user_id = req.user.id; // Getting the user_id from the authenticated token
+    const { is_read, page = 1, limit = 10 } = req.query;
 
-    const filters = [];
-    const values = [];
-    if (sender_id) {
-        filters.push('sender_id = ?');
-        values.push(sender_id);
-    }
-    if (receiver_id) {
-        filters.push('receiver_id = ?');
-        values.push(receiver_id);
-    }
+    // console.log("User ID: ", user_id);
+
+    const filters = ['(sender_id = ? OR receiver_id = ?)'];  // Check if user_id is either sender or receiver
+    const values = [user_id, user_id];  // Set the user_id for both sender and receiver checks
+
     if (is_read !== undefined) {
         filters.push('is_read = ?');
-        values.push(parseInt(is_read));
+        values.push(parseInt(is_read)); // Optional filter for read/unread status
     }
 
-    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const whereClause = `WHERE ${filters.join(' AND ')}`;
     const offset = (page - 1) * limit;
 
     try {
@@ -58,14 +54,16 @@ router.get('/', authenticateToken, async (req, res) => {
             `SELECT * FROM messages ${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
             [...values, parseInt(limit), parseInt(offset)]
         );
-        res.status(200).json(rows);
+        res.status(200).json(rows); // Return the filtered messages
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
 
+
 // READ a single message by ID
+/*
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
@@ -80,8 +78,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+*/
 
 // PARTIAL UPDATE a message (e.g., marking as read)
+/*
 router.patch('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
@@ -107,21 +107,40 @@ router.patch('/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+*/
 
 // DELETE a message
 router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
+    const user_id = req.user.id; // Getting the user_id from the authenticated token
+
+    console.log("User ID: ", user_id);
 
     try {
+        // First, check if the message exists and if the user is the sender
+        const [message] = await db.execute(
+            `SELECT * FROM messages WHERE id = ? AND sender_id = ?`,
+            [id, user_id]
+        );
+
+        // If no message is found or the user is not the sender, return a 404 error
+        if (message.length === 0) {
+            return res.status(404).json({ error: 'Message not found or you do not have permission to delete it.' });
+        }
+
+        // Proceed with deletion if the user is the sender
         const [result] = await db.execute(`DELETE FROM messages WHERE id = ?`, [id]);
+        
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Message not found.' });
         }
+
         res.status(200).json({ message: 'Message deleted successfully.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 module.exports = router;

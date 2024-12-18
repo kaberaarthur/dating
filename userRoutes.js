@@ -8,7 +8,7 @@ const router = express.Router();
 const JWT_SECRET = 'gE4jiApK5sCdBx4';
 const REFRESH_TOKEN_SECRET = 'N0p4$$word?';
 const REFRESH_TOKEN_EXPIRY = '1000d';
-const ACCESS_TOKEN_EXPIRY = '1h';
+const ACCESS_TOKEN_EXPIRY = '12h';
 
 // Middleware to verify access tokens
 const authenticateToken = (req, res, next) => {
