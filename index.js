@@ -7,6 +7,7 @@ const userRoutes = require('./userRoutes');
 const userProfiles = require('./userProfiles/allRoutes');
 const userImages = require('./userImages/allRoutes');
 const plans = require('./plans/allRoutes');
+const subscriptions = require('./subscriptions/allRoutes');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/user-profiles', userProfiles);
 app.use('/api/user-images', userImages);
 app.use('/api/plans', plans);
+app.use('/api/subscriptions', subscriptions);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {

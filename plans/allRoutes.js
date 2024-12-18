@@ -13,23 +13,24 @@ function requireAdminOrSuperAdmin(req, res, next) {
     return res.status(403).json({ error: 'Access denied. Only admin or superadmin can perform this action.' });
 }
 
-// CREATE a new plan
 router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
-    const { name, description, price_male, price_female, features } = req.body;
+    const { name, description, price_male, price_female, features, period } = req.body;
 
-    if (!name || !price_male || !price_female) {
-        return res.status(400).json({ error: 'Name, price_male, and price_female are required.' });
+    if (!name || !price_male || !price_female || !period) {
+        return res.status(400).json({ error: 'Name, price_male, price_female, and period are required.' });
     }
 
     try {
         const [result] = await db.execute(
-            `INSERT INTO plans (name, description, price_male, price_female, features) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO plans (name, description, price_male, price_female, features, period) 
+            VALUES (?, ?, ?, ?, ?, ?)`,
             [
                 name,
                 description || null,
                 price_male,
                 price_female,
                 features ? JSON.stringify(features) : null,
+                period,
             ]
         );
 
@@ -40,6 +41,7 @@ router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) =
             price_male,
             price_female,
             features,
+            period,
         });
     } catch (error) {
         console.error(error);
@@ -51,46 +53,43 @@ router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) =
     }
 });
 
+
 // READ all plans with optional filters
-router.get('/', authenticateToken, async (req, res) => {
-    const { price_male, price_female, created_after, created_before } = req.query;
+router.patch('/:id', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
 
-    const filters = [];
-    const values = [];
-
-    if (price_male) {
-        filters.push('price_male = ?');
-        values.push(price_male);
+    if (!updates || Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No fields to update.' });
     }
 
-    if (price_female) {
-        filters.push('price_female = ?');
-        values.push(price_female);
-    }
+    const fields = Object.keys(updates).map((field) => `${field} = ?`).join(', ');
 
-    if (created_after) {
-        filters.push('created_at >= ?');
-        values.push(created_after);
-    }
-
-    if (created_before) {
-        filters.push('created_at <= ?');
-        values.push(created_before);
-    }
-
-    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const values = Object.values(updates);
 
     try {
-        const [rows] = await db.execute(
-            `SELECT * FROM plans ${whereClause} ORDER BY created_at DESC`
-            , values
+        const [result] = await db.execute(
+            `UPDATE plans SET ${fields}, updated_at = current_timestamp() WHERE id = ?`,
+            [...values, id]
         );
-        res.status(200).json(rows);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Plan not found.' });
+        }
+
+        // Fetch the updated plan
+        const [updatedPlan] = await db.execute('SELECT * FROM plans WHERE id = ?', [id]);
+
+        res.status(200).json({
+            message: 'Plan updated successfully.',
+            updatedPlan: updatedPlan[0],
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // READ a single plan by ID
 router.get('/:id', authenticateToken, async (req, res) => {
