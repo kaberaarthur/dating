@@ -9,6 +9,7 @@ const userImages = require('./userImages/allRoutes');
 const plans = require('./plans/allRoutes');
 const subscriptions = require('./subscriptions/allRoutes');
 const messages = require('./messages/allRoutes');
+const matching = require('./matching/allRoutes');
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/user-images', userImages);
 app.use('/api/plans', plans);
 app.use('/api/subscriptions', subscriptions);
 app.use('/api/messages', messages);
+app.use('/api/matching', matching);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {
