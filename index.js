@@ -10,6 +10,7 @@ const plans = require('./plans/allRoutes');
 const subscriptions = require('./subscriptions/allRoutes');
 const messages = require('./messages/allRoutes');
 const matching = require('./matching/allRoutes');
+const mpesaRequests = require('./mpesaRequests/allRoutes');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/plans', plans);
 app.use('/api/subscriptions', subscriptions);
 app.use('/api/messages', messages);
 app.use('/api/matching', matching);
+app.use('/api/mpesa-requests', mpesaRequests);
 
 // Health Check Endpoint
 app.get('/', (req, res) => {

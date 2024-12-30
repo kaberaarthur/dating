@@ -2,28 +2,97 @@ const express = require('express');
 const db = require('../dbPromise'); // MySQL pool connection
 const authenticateToken = require('../customMiddleware'); // Middleware for token authentication
 
+// Load environment variables
+require('dotenv').config();
+
+// Access the authorization token
+const authorizationToken = process.env.PAYHERO_AUTHORIZATION_TOKEN;
+const channelID = process.env.PAYHERO_CHANNEL_ID;
+
+
 const router = express.Router();
 
-// CREATE a new Mpesa request
+// Function to get the price based on gender
+const getPriceBasedOnGender = (plan, profile) => {
+    if (!plan || !profile) {
+        throw new Error('Plan and profile details are required.');
+    }
+
+    const gender = profile.gender.toLowerCase();
+    let price;
+
+    if (gender === 'male') {
+        price = parseFloat(plan.price_male);
+    } else if (gender === 'female') {
+        price = parseFloat(plan.price_female);
+    } else {
+        throw new Error('Invalid gender specified in profile details.');
+    }
+
+    return price;
+};
+
+// CREATE a new comprehensive Mpesa request
 router.post('/', authenticateToken, async (req, res) => {
-    const { success, status, reference, checkout_request_id, phone } = req.body;
+    const { phone, plan_id } = req.body;
+    const user_id = req.user.id;
 
     // Validate required fields
-    if (success === undefined || !status || !reference || !checkout_request_id || !phone) {
+    if (!plan_id || !phone) {
         return res.status(400).json({ error: 'All fields are required.' });
     }
 
-    try {
-        const [result] = await db.execute(
-            `INSERT INTO mpesa_requests (success, status, reference, checkout_request_id, phone) 
-            VALUES (?, ?, ?, ?, ?)`,
-            [success, status, reference, checkout_request_id, phone]
-        );
-        res.status(201).json({ id: result.insertId, success, status, reference, checkout_request_id, phone });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error.' });
+    // Get Plan Details
+    const [rows] = await db.execute(`SELECT * FROM plans WHERE id = ?`, [plan_id]);
+    if (rows.length === 0) {
+        return res.status(404).json({ error: 'Plan not found.' });
     }
+    const planDetails = rows[0];
+
+
+    // Get Profile Details
+    const [profileRows] = await db.execute(`SELECT * FROM user_profiles WHERE user_id = ?`, [user_id]);
+    if (profileRows.length === 0) {
+        return res.status(404).json({ error: 'User profile not found.' });
+    }
+    const profileDetails = profileRows[0];
+
+    const plan_price = getPriceBasedOnGender(planDetails, profileDetails);
+
+    paymentData = {
+        "amount": plan_price,
+        "phone_number": phone,
+        "channel_id": channelID, 
+        "provider": "m-pesa", 
+        "external_reference": "INV-009",
+        "callback_url": "https://example.com/callback.php"
+    }
+
+    // console.log("Payment Data: ", paymentData);
+
+    // Fetch POST request
+    fetch('https://backend.payhero.co.ke/api/v2/payments', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authorizationToken,
+        },
+        body: JSON.stringify(paymentData),
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response:', data);
+        })
+        .catch(error => {
+            console.error('Error:', error.message);
+        });
+
+    res.status(200).json(rows[0]);
 });
 
 // READ all Mpesa requests (with optional pagination)
@@ -43,6 +112,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+/*
 // READ a single Mpesa request by ID
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
@@ -110,5 +180,6 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+*/
 
 module.exports = router;

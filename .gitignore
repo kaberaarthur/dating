@@ -26,3 +26,5 @@ yarn-error.log
 
 data.json
 notes.txt
+.env
+apitoken.js
