@@ -25,6 +25,33 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+// Get all user profiles with optional name filter
+router.get('/', authenticateToken, async (req, res) => {
+    const { name } = req.query; // Get the 'name' query parameter
+
+    try {
+        let query = 'SELECT * FROM user_profiles';
+        let values = [];
+
+        // If a name is provided, filter by name
+        if (name) {
+            query += ' WHERE name LIKE ?';
+            values.push(`%${name}%`);
+        }
+
+        const [rows] = await db.execute(query, values);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'No profiles found' });
+        }
+
+        res.status(200).json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
 // Get user profile
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;

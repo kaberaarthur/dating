@@ -8,7 +8,7 @@ const router = express.Router();
 const JWT_SECRET = 'gE4jiApK5sCdBx4';
 const REFRESH_TOKEN_SECRET = 'N0p4$$word?';
 const REFRESH_TOKEN_EXPIRY = '1000d';
-const ACCESS_TOKEN_EXPIRY = '12h';
+const ACCESS_TOKEN_EXPIRY = '12000h';
 
 // Middleware to verify access tokens
 const authenticateToken = (req, res, next) => {
@@ -23,19 +23,21 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+
 // Register a new user and log them in
 router.post('/register', async (req, res) => {
-    const { name, email, password, phone, user_type, auth_provider = 'manual', email_verified = false, phone_verified = false, two_fa_enabled = false } = req.body;
+    const { name, email, password, phone, auth_provider = 'manual', email_verified = false, phone_verified = false, two_fa_enabled = false } = req.body;
 
-    if (!name || !email || !password || !phone || !user_type ) {
+    if (!name || !email || !password || !phone ) {
         return res.status(400).json({ error: 'All fields are required' });
     }
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const created_at = new Date();
-        const refreshToken = jwt.sign({ email }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
         const tokenExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24 * 1000); // Example: 1000 days from now
+
+        const user_type = "customer"
 
         const query = `
             INSERT INTO users (name, email, password, phone, user_type, auth_provider, email_verified, phone_verified, 2fa_enabled, created_at, refresh_token, token_expiry) 
@@ -57,7 +59,18 @@ router.post('/register', async (req, res) => {
         ]);
 
         const userId = result.insertId;
-        const accessToken = jwt.sign({ id: userId, user_type }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+        
+        const accessToken = jwt.sign(
+            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
+            JWT_SECRET,
+            { expiresIn: ACCESS_TOKEN_EXPIRY }
+        );
+
+        const refreshToken = jwt.sign(
+            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
+            REFRESH_TOKEN_SECRET,
+            { expiresIn: REFRESH_TOKEN_EXPIRY }
+        );
 
         res.status(201).json({
             message: 'User registered successfully',
@@ -71,7 +84,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Login
+// Login: Include 'active' in the JWT token
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
@@ -104,12 +117,12 @@ router.post('/login', async (req, res) => {
         await db.execute('UPDATE users SET login_attempts = 0, last_login = NOW() WHERE id = ?', [user.id]);
 
         const accessToken = jwt.sign(
-            { id: user.id, email: user.email, user_type: user.user_type },
+            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
             JWT_SECRET,
             { expiresIn: ACCESS_TOKEN_EXPIRY }
         );
         const refreshToken = jwt.sign(
-            { id: user.id, email: user.email, user_type: user.user_type },
+            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
             REFRESH_TOKEN_SECRET,
             { expiresIn: REFRESH_TOKEN_EXPIRY }
         );
@@ -122,6 +135,50 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
+
+// Endpoint to edit user details
+router.patch('/edit-user/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { name, email, phone, active } = req.body;
+    const userId = req.user.id;
+    const userType = req.user.user_type;
+
+    try {
+        const [rows] = await db.execute('SELECT * FROM users WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+        const user = rows[0];
+        if (user.id !== userId && userType !== 'admin' && userType !== 'superadmin') {
+            return res.status(403).json({ error: 'You are not authorized to edit this user' });
+        }
+
+        const fieldsToUpdate = [];
+        const values = [];
+
+        if (name) fieldsToUpdate.push('name = ?'), values.push(name);
+        if (email) fieldsToUpdate.push('email = ?'), values.push(email);
+        if (phone) fieldsToUpdate.push('phone = ?'), values.push(phone);
+        if (active !== undefined) fieldsToUpdate.push('active = ?'), values.push(active);
+
+        if (fieldsToUpdate.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        const query = `UPDATE users SET ${fieldsToUpdate.join(', ')} WHERE id = ?`;
+        values.push(id);
+
+        const [result] = await db.execute(query, values);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found or not updated' });
+        }
+
+        res.status(200).json({ message: 'User updated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error', details: err.message });
+    }
+});
+
 
 // View profile
 router.get('/profile', authenticateToken, async (req, res) => {

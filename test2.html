@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .upload-container {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .file-group {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .preview-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .submit-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .submit-button:hover {
+            background-color: #45a049;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            display: none;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <h2>Upload Images</h2>
+        <form id="uploadForm">
+            <div class="file-group">
+                <label for="profilePicture">Profile Picture (1 image):</label>
+                <input type="file" 
+                       id="profilePicture" 
+                       name="profilePicture" 
+                       accept="image/png, image/jpeg, image/gif"
+                       onchange="previewImages(event, 'profilePreview')">
+                <div id="profilePreview" class="preview-container"></div>
+            </div>
+
+            <div class="file-group">
+                <label for="additionalImages">Additional Images (up to 3):</label>
+                <input type="file" 
+                       id="additionalImages" 
+                       name="additionalImages" 
+                       accept="image/png, image/jpeg, image/gif"
+                       multiple
+                       onchange="previewImages(event, 'additionalPreview')">
+                <div id="additionalPreview" class="preview-container"></div>
+            </div>
+
+            <button type="submit" class="submit-button">Upload All Images</button>
+        </form>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function previewImages(event, previewId) {
+            const preview = document.getElementById(previewId);
+            preview.innerHTML = '';
+            
+            const files = event.target.files;
+            
+            if (files) {
+                Array.from(files).forEach(file => {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    img.className = 'preview-image';
+                    img.onload = () => URL.revokeObjectURL(img.src);
+                    preview.appendChild(img);
+                });
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('uploadForm').reset();
+            document.getElementById('profilePreview').innerHTML = '';
+            document.getElementById('additionalPreview').innerHTML = '';
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const statusDiv = document.getElementById('status');
+            const formData = new FormData();
+            const profileInput = document.getElementById('profilePicture');
+            const additionalInput = document.getElementById('additionalImages');
+            
+            // Check if profile picture is selected
+            if (profileInput.files[0]) {
+                formData.append('profilePicture', profileInput.files[0]);
+            }
+
+            // Check if additional images are selected
+            if (additionalInput.files.length > 0) {
+                Array.from(additionalInput.files).forEach(file => {
+                    formData.append('additionalImages', file);
+                });
+            }
+
+            // Validate number of files
+            if (additionalInput.files.length > 3) {
+                statusDiv.textContent = 'You can only upload up to 3 additional images';
+                statusDiv.className = 'error';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/api/image-upload/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.textContent = 'Files uploaded successfully!';
+                    statusDiv.className = 'success';
+                    // Clear form and previews after successful upload
+                    clearForm();
+                } else {
+                    statusDiv.textContent = `Upload failed: ${data.error}`;
+                    statusDiv.className = 'error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `Upload failed: ${error.message}`;
+                statusDiv.className = 'error';
+            }
+            
+            statusDiv.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
