@@ -4,44 +4,76 @@ const authenticateToken = require('../customMiddleware'); // Token-based authent
 
 const router = express.Router();
 
-// CREATE a new match
+// CREATE or UPDATE a match
 router.post('/', authenticateToken, async (req, res) => {
-    const { user_id, matched_user_id, compatibility_score, is_liked } = req.body;
+    const { matched_user_id, compatibility_score, is_liked } = req.body;
 
-    if (!user_id || !matched_user_id) {
-        return res.status(400).json({ error: 'user_id and matched_user_id are required.' });
+    if (!req.user || !req.user.id) {
+        return res.status(400).json({ error: 'User ID is missing in token.' });
+    }
+
+    const user_id = req.user.id; // Extract user_id from the token
+    console.log("User ID", user_id);
+
+    if (!matched_user_id) {
+        return res.status(400).json({ error: 'matched_user_id is required.' });
     }
 
     try {
-        const [result] = await db.execute(
-            `INSERT INTO matching (user_id, matched_user_id, compatibility_score, is_liked, matched_date) 
-            VALUES (?, ?, ?, ?, ?)`,
-            [
+        // Check if a match already exists
+        const [existingMatch] = await db.execute(
+            `SELECT * FROM matching 
+            WHERE (user_id = ? AND matched_user_id = ?) 
+               OR (user_id = ? AND matched_user_id = ?)`,
+            [user_id, matched_user_id, matched_user_id, user_id]
+        );
+
+        if (existingMatch.length > 0) {
+            // If a match exists, update the matched_date field
+            await db.execute(
+                `UPDATE matching 
+                SET matched_date = ? 
+                WHERE (user_id = ? AND matched_user_id = ?) 
+                   OR (user_id = ? AND matched_user_id = ?)`,
+                [new Date(), user_id, matched_user_id, matched_user_id, user_id]
+            );
+
+            return res.status(200).json({
+                message: 'Match updated successfully.',
                 user_id,
                 matched_user_id,
-                compatibility_score || 0.00,
-                is_liked || 0,
-                new Date(),
-            ]
-        );
-        res.status(201).json({
-            id: result.insertId,
-            user_id,
-            matched_user_id,
-            compatibility_score: compatibility_score || 0.00,
-            is_liked: is_liked || 0,
-            is_mutual: 0,
-            matched_date: new Date(),
-        });
+                updated_date: new Date(),
+            });
+        } else {
+            // Insert a new match if it doesn't exist
+            const [result] = await db.execute(
+                `INSERT INTO matching (user_id, matched_user_id, compatibility_score, is_liked, matched_date) 
+                VALUES (?, ?, ?, ?, ?)`,
+                [
+                    user_id,
+                    matched_user_id,
+                    compatibility_score || 0.00,
+                    is_liked || 0,
+                    new Date(),
+                ]
+            );
+
+            return res.status(201).json({
+                id: result.insertId,
+                user_id,
+                matched_user_id,
+                compatibility_score: compatibility_score || 0.00,
+                is_liked: is_liked || 0,
+                is_mutual: 0,
+                matched_date: new Date(),
+            });
+        }
     } catch (error) {
         console.error(error);
-        if (error.code === 'ER_DUP_ENTRY') {
-            res.status(409).json({ error: 'Match already exists between these users.' });
-        } else {
-            res.status(500).json({ error: 'Server error.' });
-        }
+        res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // READ all matches for a user
 router.get('/', authenticateToken, async (req, res) => {
