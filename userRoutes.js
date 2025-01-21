@@ -24,11 +24,10 @@ const authenticateToken = (req, res, next) => {
 };
 
 
-// Register a new user and log them in
 router.post('/register', async (req, res) => {
     const { name, email, password, phone, auth_provider = 'manual', email_verified = false, phone_verified = false, two_fa_enabled = false } = req.body;
 
-    if (!name || !email || !password || !phone ) {
+    if (!name || !email || !password || !phone) {
         return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -37,7 +36,14 @@ router.post('/register', async (req, res) => {
         const created_at = new Date();
         const tokenExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24 * 1000); // Example: 1000 days from now
 
-        const user_type = "customer"
+        const user_type = "customer";
+
+        // Generate refresh token first
+        const refreshToken = jwt.sign(
+            { email },
+            REFRESH_TOKEN_SECRET,
+            { expiresIn: REFRESH_TOKEN_EXPIRY }
+        );
 
         const query = `
             INSERT INTO users (name, email, password, phone, user_type, auth_provider, email_verified, phone_verified, 2fa_enabled, created_at, refresh_token, token_expiry) 
@@ -59,17 +65,12 @@ router.post('/register', async (req, res) => {
         ]);
 
         const userId = result.insertId;
-        
+
+        // Generate access token
         const accessToken = jwt.sign(
-            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
+            { id: userId, email, user_type },
             JWT_SECRET,
             { expiresIn: ACCESS_TOKEN_EXPIRY }
-        );
-
-        const refreshToken = jwt.sign(
-            { id: user.id, email: user.email, user_type: user.user_type, active: user.active },
-            REFRESH_TOKEN_SECRET,
-            { expiresIn: REFRESH_TOKEN_EXPIRY }
         );
 
         res.status(201).json({
@@ -83,6 +84,7 @@ router.post('/register', async (req, res) => {
         res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
+
 
 // Login: Include 'active' in the JWT token
 router.post('/login', async (req, res) => {
@@ -130,7 +132,7 @@ router.post('/login', async (req, res) => {
         // Store refresh token in the database
         await db.execute('UPDATE users SET refresh_token = ? WHERE id = ?', [refreshToken, user.id]);
 
-        res.json({ accessToken, refreshToken });
+        res.json({ accessToken, refreshToken, user_id:user.id });
     } catch (err) {
         res.status(500).json({ error: 'Database error', details: err.message });
     }

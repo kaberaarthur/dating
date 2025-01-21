@@ -59,7 +59,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const user_type = req.user.user_type; // Get the user type from the JWT token
 
     try {
-        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE id = ?', [id]);
+        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE user_id = ?', [id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Profile not found' });
         }

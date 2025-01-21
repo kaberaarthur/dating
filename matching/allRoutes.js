@@ -76,33 +76,48 @@ router.post('/', authenticateToken, async (req, res) => {
 
 
 // READ all matches for a user
-router.get('/', authenticateToken, async (req, res) => {
-    const { user_id, is_mutual, is_liked, page = 1, limit = 10 } = req.query;
+router.get('/mylikes', authenticateToken, async (req, res) => {
+    const { is_liked, page = 1, limit = 10 } = req.query;
 
-    if (!user_id) {
-        return res.status(400).json({ error: 'user_id is required.' });
+    if (!req.user || !req.user.id) {
+        return res.status(400).json({ error: 'User ID is missing in token.' });
     }
 
-    const filters = ['user_id = ?'];
+    const user_id = req.user.id;
+
+    const filters = ['m.user_id = ?', 'm.is_mutual = 0']; // Add the `is_mutual = 0` filter
     const values = [user_id];
 
-    if (is_mutual !== undefined) {
-        filters.push('is_mutual = ?');
-        values.push(parseInt(is_mutual));
-    }
     if (is_liked !== undefined) {
-        filters.push('is_liked = ?');
+        filters.push('m.is_liked = ?');
         values.push(parseInt(is_liked));
     }
 
-    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const whereClause = `WHERE ${filters.join(' AND ')}`;
     const offset = (page - 1) * limit;
 
     try {
         const [rows] = await db.execute(
-            `SELECT * FROM matching ${whereClause} ORDER BY matched_date DESC LIMIT ? OFFSET ?`,
+            `SELECT 
+                m.id AS match_id,
+                m.compatibility_score,
+                m.is_liked,
+                m.is_mutual,
+                m.matched_date,
+                u.name AS matched_user_name,
+                u.date_of_birth,
+                u.reason,
+                u.interests
+             FROM 
+                matching m
+             JOIN 
+                user_profiles u ON m.matched_user_id = u.user_id
+             ${whereClause}
+             ORDER BY m.matched_date DESC
+             LIMIT ? OFFSET ?`,
             [...values, parseInt(limit), parseInt(offset)]
         );
+
         res.status(200).json(rows);
     } catch (error) {
         console.error(error);
@@ -110,16 +125,16 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// READ a single match by ID
-router.get('/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
+
+// Get All Documents
+router.get('/', authenticateToken, async (req, res) => {
 
     try {
-        const [rows] = await db.execute(`SELECT * FROM matching WHERE id = ?`, [id]);
+        const [rows] = await db.execute(`SELECT * FROM matching`);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Match not found.' });
         }
-        res.status(200).json(rows[0]);
+        res.status(200).json(rows);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
@@ -130,6 +145,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.patch('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
+
+    if (!req.user || !req.user.id) {
+        return res.status(400).json({ error: 'User ID is missing in token.' });
+    }
 
     if (!updates || Object.keys(updates).length === 0) {
         return res.status(400).json({ error: 'No fields to update.' });
