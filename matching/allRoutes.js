@@ -107,7 +107,8 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
                 u.name AS matched_user_name,
                 u.date_of_birth,
                 u.reason,
-                u.interests
+                u.interests,
+                u.profile_picture
              FROM 
                 matching m
              JOIN 
