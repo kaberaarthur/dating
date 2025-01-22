@@ -85,7 +85,7 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
 
     const user_id = req.user.id;
 
-    const filters = ['m.user_id = ?', 'm.is_mutual = 0']; // Add the `is_mutual = 0` filter
+    const filters = ['m.matched_user_id = ?', 'm.is_mutual = 0']; // Change filter to use m.user_id
     const values = [user_id];
 
     if (is_liked !== undefined) {
@@ -99,12 +99,13 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
     try {
         const [rows] = await db.execute(
             `SELECT 
-                m.id AS match_id,
+                m.id,
+                m.user_id,
                 m.compatibility_score,
                 m.is_liked,
                 m.is_mutual,
                 m.matched_date,
-                u.name AS matched_user_name,
+                u.name AS user_name, -- Retrieve based on m.user_id
                 u.date_of_birth,
                 u.reason,
                 u.interests,
@@ -112,7 +113,7 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
              FROM 
                 matching m
              JOIN 
-                user_profiles u ON m.matched_user_id = u.user_id
+                user_profiles u ON m.user_id = u.user_id
              ${whereClause}
              ORDER BY m.matched_date DESC
              LIMIT ? OFFSET ?`,
@@ -125,6 +126,7 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 
 // Get All Documents
