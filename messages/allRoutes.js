@@ -115,10 +115,8 @@ router.get('/', authenticateToken, async (req, res) => {
     const user_id = req.user.id; // Getting the user_id from the authenticated token
     const { is_read, page = 1, limit = 10 } = req.query;
 
-    // console.log("User ID: ", user_id);
-
-    const filters = ['(sender_id = ? OR receiver_id = ?)'];  // Check if user_id is either sender or receiver
-    const values = [user_id, user_id];  // Set the user_id for both sender and receiver checks
+    const filters = ['(sender_id = ? OR receiver_id = ?)']; // Check if user_id is either sender or receiver
+    const values = [user_id, user_id]; // Set the user_id for both sender and receiver checks
 
     if (is_read !== undefined) {
         filters.push('is_read = ?');
@@ -133,12 +131,46 @@ router.get('/', authenticateToken, async (req, res) => {
             `SELECT * FROM messages ${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
             [...values, parseInt(limit), parseInt(offset)]
         );
-        res.status(200).json(rows); // Return the filtered messages
+
+        // Transform the data into the desired format
+        const formattedData = rows.reduce((result, row) => {
+            const isRequesterSender = row.sender_id === user_id;
+
+            // Check if a conversation with this contact already exists
+            let conversation = result.find(
+                (conv) => conv.id === (isRequesterSender ? row.receiver_id : row.sender_id)
+            );
+
+            if (!conversation) {
+                // Add a new conversation
+                conversation = {
+                    id: isRequesterSender ? row.receiver_id : row.sender_id,
+                    name: isRequesterSender ? row.receiver_name : row.sender_name,
+                    profilePicture: isRequesterSender
+                        ? row.receiver_profile_picture
+                        : row.sender_profile_picture,
+                    conversation: [],
+                };
+                result.push(conversation);
+            }
+
+            // Add the message to the conversation
+            conversation.conversation.push({
+                sender: isRequesterSender ? 'You' : row.sender_name,
+                message: row.message,
+                timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            });
+
+            return result;
+        }, []);
+
+        res.status(200).json(formattedData);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // DELETE a message
 router.delete('/:id', authenticateToken, async (req, res) => {
