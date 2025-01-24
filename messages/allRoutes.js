@@ -109,9 +109,7 @@ router.post('/', authenticateToken, async (req, res) => {
   });
   
 
-
-// READ all messages (with optional filters)
-router.get('/', authenticateToken, async (req, res) => {
+  router.get('/', authenticateToken, async (req, res) => {
     const user_id = req.user.id; // Getting the user_id from the authenticated token
     const { is_read, page = 1, limit = 10 } = req.query;
 
@@ -154,11 +152,21 @@ router.get('/', authenticateToken, async (req, res) => {
                 result.push(conversation);
             }
 
+            // Format timestamp to include date and time
+            const formattedTimestamp = new Date(row.timestamp).toLocaleString([], { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+
             // Add the message to the conversation
             conversation.conversation.push({
                 sender: isRequesterSender ? 'You' : row.sender_name,
                 message: row.message,
-                timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: formattedTimestamp,
             });
 
             return result;
@@ -170,7 +178,6 @@ router.get('/', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
-
 
 // DELETE a message
 router.delete('/:id', authenticateToken, async (req, res) => {
