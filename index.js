@@ -13,6 +13,7 @@ const subscriptions = require('./subscriptions/allRoutes');
 const messages = require('./messages/allRoutes');
 const matching = require('./matching/allRoutes');
 const mpesaRequests = require('./mpesaRequests/allRoutes');
+const mpesaPayments = require('./mpesaPayments/allRoutes');
 const imageUploadRoutes = require('./uploadphoto/allRoutes');
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/subscriptions', subscriptions);
 app.use('/api/messages', messages);
 app.use('/api/matching', matching);
 app.use('/api/mpesa-requests', mpesaRequests);
+app.use('/api/mpesa-payments', mpesaPayments);
 app.use('/api/image-upload', imageUploadRoutes);
 
 // Health Check Endpoint
