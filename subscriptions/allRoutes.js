@@ -90,6 +90,35 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+// READ subscription by user_id
+router.post('/check-subscription', authenticateToken, async (req, res) => {
+    const { user_id } = req.body;
+
+    if (!user_id) {
+        return res.status(400).json({ error: 'User ID is required.' });
+    }
+
+    try {
+        const [rows] = await db.execute(`SELECT payment_status FROM subscriptions WHERE user_id = ? LIMIT 1`, [user_id]);
+
+        if (rows.length === 0) {
+            return res.status(200).json({ hasSubscription: false });
+        }
+
+        const { payment_status } = rows[0];
+
+        res.status(200).json({ 
+            hasSubscription: true,
+            isPaid: payment_status === 'paid'
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+
 // READ a single subscription by ID
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
