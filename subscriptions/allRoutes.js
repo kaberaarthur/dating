@@ -102,7 +102,7 @@ router.post('/check-subscription', authenticateToken, async (req, res) => {
         const [rows] = await db.execute(`SELECT payment_status FROM subscriptions WHERE user_id = ? LIMIT 1`, [user_id]);
 
         if (rows.length === 0) {
-            return res.status(200).json({ hasSubscription: false });
+            return res.status(200).json({ hasSubscription: false, isPaid: false });
         }
 
         const { payment_status } = rows[0];
