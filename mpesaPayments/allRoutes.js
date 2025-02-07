@@ -4,19 +4,40 @@ const authenticateToken = require('../customMiddleware'); // Middleware for toke
 
 const router = express.Router();
 
-// CREATE a new Mpesa payment
-router.post('/', authenticateToken, async (req, res) => {
+const fs = require('fs');
+const path = require('path');
+
+
+// Record Mpesa Payment
+router.post('/', async (req, res) => {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const logFilePath = path.join(__dirname, 'access.log');
+
+    // Log request details
+    const logEntry = `[${new Date().toISOString()}] IP: ${clientIp} - ${req.method} ${req.originalUrl}\n`;
+    fs.appendFile(logFilePath, logEntry, (err) => {
+        if (err) {
+            console.error('Failed to write to log file', err);
+        }
+    });
+
+    const { response } = req.body; // Extract the response object
+
+    if (!response) {
+        return res.status(400).json({ error: 'Response object is required.' });
+    }
+
     const {
-        amount,
-        checkout_request_id,
-        external_reference,
-        merchant_request_id,
-        mpesa_receipt_number,
-        phone,
-        result_code,
-        result_desc,
-        status
-    } = req.body;
+        Amount: amount,
+        CheckoutRequestID: checkout_request_id,
+        ExternalReference: external_reference,
+        MerchantRequestID: merchant_request_id,
+        MpesaReceiptNumber: mpesa_receipt_number,
+        Phone: phone,
+        ResultCode: result_code,
+        ResultDesc: result_desc,
+        Status: status
+    } = response;
 
     // Validate required fields
     if (
@@ -49,6 +70,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 status
             ]
         );
+
         res.status(201).json({
             id: result.insertId,
             amount,
@@ -61,11 +83,13 @@ router.post('/', authenticateToken, async (req, res) => {
             result_desc,
             status
         });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // READ all Mpesa payments (with optional pagination)
 router.get('/', authenticateToken, async (req, res) => {

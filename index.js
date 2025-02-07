@@ -18,8 +18,17 @@ const imageUploadRoutes = require('./uploadphoto/allRoutes');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+    origin: '*', // Allow all origins (or specify allowed origins as an array)
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Allowed methods
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+};
+
+// Use CORS middleware
+app.use(cors(corsOptions));
+
+// Other Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
