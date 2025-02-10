@@ -110,24 +110,15 @@ router.post('/', authenticateToken, async (req, res) => {
   
 
   router.get('/', authenticateToken, async (req, res) => {
-    const user_id = req.user.id; // Getting the user_id from the authenticated token
-    const { is_read, page = 1, limit = 10 } = req.query;
+    const user_id = req.user.id;
 
-    const filters = ['(sender_id = ? OR receiver_id = ?)']; // Check if user_id is either sender or receiver
-    const values = [user_id, user_id]; // Set the user_id for both sender and receiver checks
+    const values = [user_id, user_id]; // Always include sender and receiver filters
+    let whereClause = 'WHERE (sender_id = ? OR receiver_id = ?)';
 
-    if (is_read !== undefined) {
-        filters.push('is_read = ?');
-        values.push(parseInt(is_read)); // Optional filter for read/unread status
-    }
-
-    const whereClause = `WHERE ${filters.join(' AND ')}`;
-    const offset = (page - 1) * limit;
-
-    try {
+    try {      
         const [rows] = await db.execute(
-            `SELECT * FROM messages ${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
-            [...values, parseInt(limit), parseInt(offset)]
+            `SELECT * FROM messages ${whereClause} ORDER BY timestamp DESC`,
+            values
         );
 
         // Transform the data into the desired format

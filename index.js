@@ -3,6 +3,9 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 
+// Call DB
+const db = require('./dbPromise');
+
 
 // Route Imports
 const userRoutes = require('./userRoutes');
@@ -53,8 +56,15 @@ app.use('/api/image-upload', imageUploadRoutes);
 app.use('/api/superlikes', superlikesRoutes);
 
 // Health Check Endpoint
-app.get('/', (req, res) => {
-    res.send('API is running...');
+app.get('/', async (req, res) => {
+    try {
+        const [results] = await db.query('SELECT * FROM messages WHERE (sender_id = 4 OR receiver_id = 4) ORDER BY timestamp DESC LIMIT 10 OFFSET 0');
+        console.log(results);
+        res.json(results); // Send results as JSON
+    } catch (err) {
+        console.error('Database query error:', err);
+        res.status(500).send('Internal Server Error');
+    }
 });
 
 app.get('/upload-one', (req, res, next) => {
