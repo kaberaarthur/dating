@@ -115,9 +115,8 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
              JOIN 
                 user_profiles u ON m.user_id = u.user_id
              ${whereClause}
-             ORDER BY m.matched_date DESC
-             LIMIT ? OFFSET ?`,
-            [...values, parseInt(limit), parseInt(offset)]
+             ORDER BY m.matched_date DESC`,
+            values
         );
 
         res.status(200).json(rows);
