@@ -51,6 +51,27 @@ router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) =
     }
 });
 
+router.get('/my-subscription', authenticateToken, async (req, res) => {
+    const userId = req.user.id; // Get the user id from the token
+
+    if (!userId) {
+        return res.status(400).json({ error: "User ID not found in token" });
+    }
+
+    try {
+        const [rows] = await db.execute('SELECT * FROM subscriptions WHERE user_id = ?', [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Subscription not found" });
+        }
+
+        res.status(200).json(rows[0]); // Return the first result (since user_id should be unique)
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
 // READ all subscriptions (with optional filters)
 router.get('/', authenticateToken, async (req, res) => {
     const { user_id, subscription_type, payment_status, plan_id, page = 1, limit = 10 } = req.query;
