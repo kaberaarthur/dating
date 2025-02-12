@@ -26,6 +26,46 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Get all user profiles with optional name filter
+router.get("/my-profile", authenticateToken, async (req, res) => {
+    const userId = req.user.id; // Get the user id from the token
+
+    if (!userId) {
+        return res.status(400).json({ error: "User ID not found in token" });
+    }
+
+    try {
+        let query = `
+            SELECT 
+                up.id, 
+                up.user_id, 
+                up.name, 
+                up.created_at, 
+                up.profile_picture, 
+                u.last_login, 
+                u.active, 
+                u.phone, 
+                u.email, 
+                u.user_type
+            FROM user_profiles up
+            JOIN users u ON up.user_id = u.id
+            WHERE up.user_id = ?
+        `;
+        
+        const [rows] = await db.execute(query, [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Profile not found" });
+        }
+
+        res.status(200).json(rows[0]); // Return the first result (since user_id should be unique)
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+
+// Get all user profiles with optional name filter
 router.get("/", authenticateToken, async (req, res) => {
     const { name } = req.query; // Get the 'name' query parameter
 
