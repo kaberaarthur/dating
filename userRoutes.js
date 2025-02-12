@@ -181,6 +181,33 @@ router.patch('/edit-user/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Activate or deactivate a user
+router.post("/toggle-user-status", authenticateToken, async (req, res) => {
+    const { user_id, active } = req.body; // Get user ID and new active status
+  
+    if (typeof user_id !== "number" || typeof active !== "number") {
+      return res.status(400).json({ error: "Invalid input data" });
+    }
+  
+    try {
+      // Update user's active status
+      const [result] = await db.execute(
+        "UPDATE users SET active = ? WHERE id = ?",
+        [active, user_id]
+      );
+  
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+  
+      res.status(200).json({ message: "User status updated successfully" });
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  
+
 
 // View profile
 router.get('/profile', authenticateToken, async (req, res) => {

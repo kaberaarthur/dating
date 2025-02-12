@@ -59,19 +59,19 @@ router.get('/', authenticateToken, async (req, res) => {
     const values = [];
 
     if (user_id) {
-        filters.push('user_id = ?');
+        filters.push('s.user_id = ?');
         values.push(user_id);
     }
     if (subscription_type) {
-        filters.push('subscription_type = ?');
+        filters.push('s.subscription_type = ?');
         values.push(subscription_type);
     }
     if (payment_status) {
-        filters.push('payment_status = ?');
+        filters.push('s.payment_status = ?');
         values.push(payment_status);
     }
     if (plan_id) {
-        filters.push('plan_id = ?');
+        filters.push('s.plan_id = ?');
         values.push(plan_id);
     }
 
@@ -80,15 +80,26 @@ router.get('/', authenticateToken, async (req, res) => {
 
     try {
         const [rows] = await db.execute(
-            `SELECT * FROM subscriptions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-            [...values, parseInt(limit, 10), parseInt(offset, 10)]
+            `
+            SELECT 
+                s.*, 
+                u.name AS user_name, 
+                u.phone AS user_phone
+            FROM subscriptions s
+            JOIN users u ON s.user_id = u.id
+            ${whereClause}
+            ORDER BY s.created_at DESC
+            `,
+            [...values]
         );
+
         res.status(200).json(rows);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // READ subscription by user_id
 router.post('/check-subscription', authenticateToken, async (req, res) => {

@@ -33,9 +33,10 @@ router.get("/", authenticateToken, async (req, res) => {
         let query = `
             SELECT 
                 up.id, 
+                up.user_id, 
                 up.name, 
                 up.created_at, 
-                
+
                 u.last_login, 
                 u.active, 
                 u.phone, 

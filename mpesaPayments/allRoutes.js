@@ -98,8 +98,7 @@ router.get('/', authenticateToken, async (req, res) => {
     try {
         const offset = (page - 1) * limit;
         const [rows] = await db.execute(
-            `SELECT * FROM mpesa_payments ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-            [parseInt(limit), parseInt(offset)]
+            `SELECT * FROM mpesa_payments ORDER BY created_at DESC`
         );
         res.status(200).json(rows);
     } catch (error) {
