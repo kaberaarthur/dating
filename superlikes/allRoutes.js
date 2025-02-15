@@ -196,4 +196,104 @@ router.get("/count", authenticateToken, async (req, res) => {
     }
 });
 
+router.post("/withdraw", authenticateToken, async (req, res) => {
+    const { id } = req.user; // Extract user ID from the token
+    const { amount } = req.body;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ message: "Invalid withdrawal amount." });
+    }
+
+    try {
+        const [userRecord] = await db.query(
+            "SELECT amount FROM superlikes_record WHERE user_id = ?",
+            [id]
+        );
+    
+        if (!userRecord || userRecord.length === 0) {
+            return res.status(404).json({ message: "User not found." });
+        }
+    
+        const userAmount = userRecord[0].amount;
+    
+        if (userAmount < amount) {
+            return res.status(400).json({ message: "Insufficient amount." });
+        }
+    
+        // Deduct amount (optional: depending on your logic, you might update it here)
+        await db.query(
+            "UPDATE superlikes_record SET amount = amount - ? WHERE user_id = ?",
+            [amount, id]
+        );
+    
+        // Create withdrawal record
+        await db.query(
+            "INSERT INTO superlikes_withdrawals (user_id, amount, status) VALUES (?, ?, 'pending')",
+            [id, amount]
+        );
+    
+        res.status(200).json({ message: "Withdrawal request submitted successfully." });
+    
+    } catch (error) {
+        console.error("Withdrawal Error:", error);
+        res.status(500).json({ message: "Internal server error." });
+    }    
+});
+
+router.get("/withdrawals", authenticateToken, async (req, res) => {
+    try {
+        const [withdrawals] = await db.query(
+            `SELECT 
+                u.id, 
+                u.name, 
+                u.phone, 
+                COUNT(w.id) AS transaction_count, 
+                SUM(w.amount) AS total_amount, 
+                GROUP_CONCAT(w.id ORDER BY w.created_at DESC) AS transaction_ids
+             FROM superlikes_withdrawals w
+             JOIN users u ON w.user_id = u.id
+             WHERE w.status = 'pending'
+             GROUP BY u.id, u.name, u.phone`
+        );
+
+        res.status(200).json({ withdrawals });
+
+    } catch (error) {
+        console.error("Error fetching pending withdrawals:", error);
+        res.status(500).json({ message: "Internal server error." });
+    }
+});
+
+
+router.post("/withdrawals/complete", authenticateToken, async (req, res) => {
+    const { user_id } = req.body;
+
+    if (!user_id) {
+        return res.status(400).json({ message: "User ID is required." });
+    }
+
+    try {
+        const [existingWithdrawals] = await db.query(
+            "SELECT id FROM superlikes_withdrawals WHERE user_id = ? AND status = 'pending'",
+            [user_id]
+        );
+
+        if (existingWithdrawals.length === 0) {
+            return res.status(404).json({ message: "No pending withdrawals found for this user." });
+        }
+
+        await db.query(
+            "UPDATE superlikes_withdrawals SET status = 'completed' WHERE user_id = ? AND status = 'pending'",
+            [user_id]
+        );
+
+        res.status(200).json({ message: "All pending withdrawals marked as completed." });
+
+    } catch (error) {
+        console.error("Error completing withdrawals:", error);
+        res.status(500).json({ message: "Internal server error." });
+    }
+});
+
+
 module.exports = router;
