@@ -16,20 +16,21 @@ function requireAdminOrSuperAdmin(req, res, next) {
 router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
     const { name, description, price_male, price_female, features, period } = req.body;
 
+    console.log("Received request body:", req.body); // ✅ Log request body
+
     if (!name || !price_male || !price_female || !period) {
         return res.status(400).json({ error: 'Name, price_male, price_female, and period are required.' });
     }
 
     try {
         const [result] = await db.execute(
-            `INSERT INTO plans (name, description, price_male, price_female, features, period) 
-            VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO plans (name, description, price_male, price_female, period) 
+            VALUES (?, ?, ?, ?, ?)`,
             [
                 name,
                 description || null,
                 price_male,
                 price_female,
-                features ? JSON.stringify(features) : null,
                 period,
             ]
         );
@@ -40,7 +41,6 @@ router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) =
             description,
             price_male,
             price_female,
-            features,
             period,
         });
     } catch (error) {
@@ -54,17 +54,22 @@ router.post('/', authenticateToken, requireAdminOrSuperAdmin, async (req, res) =
 });
 
 
-// READ all plans with optional filters
+// UPDATE a plan with optional fields (excluding price)
 router.patch('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    let updates = req.body;
+
+    // Define an array of fields to exclude
+    const restrictedFields = ['price', 'created_at', 'updated_at', 'features'];
+
+    // Remove restricted fields from updates
+    restrictedFields.forEach(field => delete updates[field]);
 
     if (!updates || Object.keys(updates).length === 0) {
         return res.status(400).json({ error: 'No fields to update.' });
     }
 
     const fields = Object.keys(updates).map((field) => `${field} = ?`).join(', ');
-
     const values = Object.values(updates);
 
     try {
@@ -89,6 +94,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // Get all plans
 router.get('/', authenticateToken, async (req, res) => {
@@ -117,12 +123,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
         // Modify plans to include the correct price based on gender
         const updatedPlans = plans.map(plan => {
-            const price = gender === 'male' ? plan.price_male : plan.price_female;
             return {
                 ...plan,
-                price: price, // Add a single price field based on gender
-                price_male: undefined, // Remove gender-specific prices
-                price_female: undefined
+                price: gender === 'male' ? plan.price_male : plan.price_female, // Gender-based price
+                price_male: plan.price_male, // Keep male price
+                price_female: plan.price_female // Keep female price
             };
         });
 
@@ -132,6 +137,7 @@ router.get('/', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Server error.' });
     }
 });
+
 
 // READ a single plan by ID
 router.get('/:id', authenticateToken, async (req, res) => {
