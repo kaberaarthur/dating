@@ -18,6 +18,7 @@ const matching = require('./matching/allRoutes');
 const mpesaRequests = require('./mpesaRequests/allRoutes');
 const mpesaPayments = require('./mpesaPayments/allRoutes');
 const imageUploadRoutes = require('./uploadphoto/allRoutes');
+const NewImageUploadRoutes = require('./uploadphoto/uploadRoute');
 const superlikesRoutes = require('./superlikes/allRoutes');
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api/matching', matching);
 app.use('/api/mpesa-requests', mpesaRequests);
 app.use('/api/mpesa-payments', mpesaPayments);
 app.use('/api/image-upload', imageUploadRoutes);
+app.use('/api/new-image-upload', NewImageUploadRoutes);
 app.use('/api/superlikes', superlikesRoutes);
 
 // Health Check Endpoint
