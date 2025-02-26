@@ -108,13 +108,13 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // Get user profile
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/one', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const user_id = req.user.id; // Get the user ID from the JWT token
     const user_type = req.user.user_type; // Get the user type from the JWT token
 
     try {
-        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE user_id = ?', [id]);
+        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE user_id = ?', [user_id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Profile not found' });
         }
@@ -132,51 +132,53 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Update user profile
-router.patch('/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { name, date_of_birth, gender, bio, reason, interests, county, town } = req.body;
+router.patch('/one', authenticateToken, async (req, res) => {
     const user_id = req.user.id;
     const user_type = req.user.user_type;
 
-    try {
-        const [rows] = await db.execute('SELECT * FROM user_profiles WHERE id = ?', [id]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Profile not found' });
-        }
+    const {
+        name, date_of_birth, gender, bio, reason, interests, county, town,
+        career, education, height, fitness, religion, images_updated, details_updated
+    } = req.body;
 
-        const profileUserId = rows[0].user_id;
-        if (profileUserId !== user_id && user_type !== 'admin' && user_type !== 'superadmin') {
-            return res.status(403).json({ error: 'You are not authorized to edit this profile.' });
+    try {
+        // Check if user profile exists
+        const [rows] = await db.execute('SELECT user_id FROM user_profiles WHERE user_id = ?', [user_id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Profile not found' });
+
+        // Authorization check
+        if (rows[0].user_id !== user_id && !['admin', 'superadmin'].includes(user_type)) {
+            return res.status(403).json({ error: 'Unauthorized to edit this profile.' });
         }
 
         const fieldsToUpdate = [];
         const values = [];
 
-        if (name) fieldsToUpdate.push('name = ?'), values.push(name);
-        if (date_of_birth) fieldsToUpdate.push('date_of_birth = ?'), values.push(date_of_birth);
-        if (gender) fieldsToUpdate.push('gender = ?'), values.push(gender);
-        if (bio) fieldsToUpdate.push('bio = ?'), values.push(bio);
-        if (reason) fieldsToUpdate.push('reason = ?'), values.push(reason);
-        if (interests) fieldsToUpdate.push('interests = ?'), values.push(JSON.stringify(interests));
-        if (county) fieldsToUpdate.push('county = ?'), values.push(county);
-        if (town) fieldsToUpdate.push('town = ?'), values.push(town);
+        const fields = {
+            name, date_of_birth, gender, bio, reason, interests, county, town,
+            career, education, height, fitness, religion, 
+            images_updated, details_updated
+        };
 
-        if (fieldsToUpdate.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value !== undefined) {  // Only include fields that are present in req.body
+                fieldsToUpdate.push(`${key} = ?`);
+                values.push(key === "interests" ? JSON.stringify(value) : value);
+            }
+        });
 
-        const query = `UPDATE user_profiles SET ${fieldsToUpdate.join(', ')} WHERE id = ?`;
-        values.push(id);
+        if (!fieldsToUpdate.length) return res.status(400).json({ error: 'No fields to update' });
+
+        values.push(user_id);
+        const query = `UPDATE user_profiles SET ${fieldsToUpdate.join(', ')} WHERE user_id = ?`;
         const [result] = await db.execute(query, values);
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Profile not found or not owned by user' });
-        }
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Profile not found or not updated' });
 
         res.status(200).json({ message: 'Profile updated successfully' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
