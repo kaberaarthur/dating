@@ -3,6 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const db = require('../dbPromise');
+const authenticateToken = require('../customMiddleware'); 
 
 // Create a router instance
 const router = express.Router();
@@ -62,6 +63,42 @@ router.post("/", upload.fields([
     res.status(500).json({ message: "Error uploading files" });
   }
 });
+
+
+// Add image names to db
+router.post('/upload-image', authenticateToken, async (req, res) => {
+  const { image_url, is_profile_picture } = req.body;
+  const user_id = req.user.id;
+
+  if (!image_url) {
+      return res.status(400).json({ error: "Image URL is required" });
+  }
+
+  try {
+      if (is_profile_picture === 1) {
+          // Set existing profile pictures to 0 before setting new one
+          await db.execute(
+              "UPDATE user_images SET is_profile_picture = 0 WHERE user_id = ?",
+              [user_id]
+          );
+      }
+
+      // Insert or update image
+      await db.execute(
+          `INSERT INTO user_images (user_id, image_url, is_profile_picture)
+           VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), is_profile_picture = VALUES(is_profile_picture)`,
+          [user_id, image_url, is_profile_picture]
+      );
+
+      res.status(200).json({ message: "Image uploaded successfully" });
+
+  } catch (error) {
+      console.error("Error uploading image:", error);
+      res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 // Export the router
 module.exports = router;
