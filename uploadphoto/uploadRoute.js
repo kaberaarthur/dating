@@ -31,38 +31,76 @@ const upload = multer({ storage });
 router.use("/uploads", express.static(uploadDir));
 // http://localhost:5000/api/new-image-upload/uploads/a.jpg
 
-// Route to handle file uploads
-router.post("/", upload.fields([
-  { name: "mainImage", maxCount: 1 },
-  { name: "secondaryImages", maxCount: 3 }, // Adjust maxCount based on your needs
-]), (req, res) => {
+
+// Get images only associated with user
+router.get('/images', authenticateToken, async (req, res) => {
+  const user_id = req.user.id;
+
   try {
-    const mainImage = req.files["mainImage"] ? req.files["mainImage"][0] : null;
-    const secondaryImages = req.files["secondaryImages"] || [];
+      const [images] = await db.execute(
+          "SELECT * FROM user_images WHERE user_id = ?",
+          [user_id]
+      );
 
-    // Log the file locations
-    if (mainImage) {
-      console.log(`Main Image Location: ${path.join(uploadDir, mainImage.filename)}`);
-      // Insert this data into db
-    }
-    secondaryImages.forEach((file, index) => {
-      console.log(`Secondary Image ${index + 1} Location: ${path.join(uploadDir, file.filename)}`);
-      // Insert this data into db
-    });
-
-    // Send success response to client
-    res.status(200).json({
-      message: "Files uploaded successfully",
-      files: {
-        mainImage: mainImage ? mainImage.filename : null,
-        secondaryImages: secondaryImages.map((file) => file.filename),
-      },
-    });
+      res.status(200).json({ images });
   } catch (error) {
-    console.error("Error uploading files:", error);
-    res.status(500).json({ message: "Error uploading files" });
+      console.error("Error fetching images:", error);
+      res.status(500).json({ error: "Server error" });
   }
 });
+
+
+// Route to handle file uploads
+router.post(
+  "/",
+  authenticateToken,
+  upload.fields([
+    { name: "mainImage", maxCount: 1 },
+    { name: "secondaryImages", maxCount: 3 },
+  ]),
+  async (req, res) => {
+    const user_id = req.user.id;
+
+    try {
+      const mainImage = req.files["mainImage"] ? req.files["mainImage"][0] : null;
+      const secondaryImages = req.files["secondaryImages"] || [];
+
+      // If there's a main image, ensure only one profile picture exists
+      if (mainImage) {
+        // Set existing profile picture to 0
+        await db.execute(
+          "UPDATE user_images SET is_profile_picture = 0 WHERE user_id = ? AND is_profile_picture = 1",
+          [user_id]
+        );
+
+        // Insert the new profile picture
+        await db.execute(
+          "INSERT INTO user_images (user_id, image_url, is_profile_picture) VALUES (?, ?, ?)",
+          [user_id, mainImage.filename, 1]
+        );
+      }
+
+      // Insert secondary images (if any)
+      for (const file of secondaryImages) {
+        await db.execute(
+          "INSERT INTO user_images (user_id, image_url, is_profile_picture) VALUES (?, ?, ?)",
+          [user_id, file.filename, 0]
+        );
+      }
+
+      // Retrieve all images for the user after upload
+      const [images] = await db.execute("SELECT * FROM user_images WHERE user_id = ?", [user_id]);
+
+      res.status(200).json({
+        message: "Files uploaded successfully",
+        images,
+      });
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      res.status(500).json({ message: "Error uploading images" });
+    }
+  }
+);
 
 
 // Add image names to db
