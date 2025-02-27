@@ -88,6 +88,12 @@ router.post(
         );
       }
 
+      // Update `images_updated` field in `user_profiles` table
+      await db.execute(
+        "UPDATE user_profiles SET images_updated = 1 WHERE user_id = ?",
+        [user_id]
+      );
+
       // Retrieve all images for the user after upload
       const [images] = await db.execute("SELECT * FROM user_images WHERE user_id = ?", [user_id]);
 
