@@ -26,6 +26,8 @@ async function updateSubscriptionIfExpired(userId, addDays) {
                 [userId, "paid", now, newEndDate, "paid"]
             );
 
+            console.log("New subscription created ending on ", newEndDate.toISOString() );
+
             return { success: true, message: "New subscription created", newEndDate: newEndDate.toISOString() };
         }
 
