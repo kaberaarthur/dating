@@ -1,6 +1,9 @@
 # Node.js dependencies
 node_modules/
 
+# Ignore images
+# uploads/
+
 # Logs
 *.log
 

@@ -41,6 +41,8 @@ router.get("/my-profile", authenticateToken, async (req, res) => {
                 up.name, 
                 up.created_at, 
                 up.profile_picture, 
+                up.images_updated, 
+                up.details_updated, 
                 u.last_login, 
                 u.active, 
                 u.phone, 
@@ -63,7 +65,6 @@ router.get("/my-profile", authenticateToken, async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
-
 
 // Get all user profiles with optional name filter
 router.get("/", authenticateToken, async (req, res) => {
