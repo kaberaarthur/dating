@@ -138,7 +138,7 @@ router.patch('/one', authenticateToken, async (req, res) => {
 
     const {
         name, date_of_birth, gender, bio, reason, interests, county, town,
-        career, education, height, fitness, religion, images_updated, details_updated
+        career, education, height, fitness, religion, images_updated
     } = req.body;
 
     try {
@@ -156,8 +156,7 @@ router.patch('/one', authenticateToken, async (req, res) => {
 
         const fields = {
             name, date_of_birth, gender, bio, reason, interests, county, town,
-            career, education, height, fitness, religion, 
-            images_updated, details_updated
+            career, education, height, fitness, religion, images_updated
         };
 
         Object.entries(fields).forEach(([key, value]) => {
@@ -166,6 +165,10 @@ router.patch('/one', authenticateToken, async (req, res) => {
                 values.push(key === "interests" ? JSON.stringify(value) : value);
             }
         });
+
+        // Ensure `details_updated` is set to `1`
+        fieldsToUpdate.push(`details_updated = ?`);
+        values.push(1);
 
         if (!fieldsToUpdate.length) return res.status(400).json({ error: 'No fields to update' });
 
@@ -181,6 +184,7 @@ router.patch('/one', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 // Delete user profile
 router.delete('/:id', authenticateToken, async (req, res) => {
