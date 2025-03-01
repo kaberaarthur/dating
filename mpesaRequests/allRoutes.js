@@ -114,8 +114,6 @@ router.post('/', authenticateToken, async (req, res) => {
         "callback_url": callback_url
     };
 
-    console.log("The Payment Data => ", paymentData)
-
     try {
         const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
             method: 'POST',

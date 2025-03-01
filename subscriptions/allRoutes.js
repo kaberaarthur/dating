@@ -124,7 +124,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 // READ subscription by user_id
 router.post('/check-subscription', authenticateToken, async (req, res) => {
-    const { user_id } = req.body;
+    const user_id = req.user.id;
 
     if (!user_id) {
         return res.status(400).json({ error: 'User ID is required.' });
