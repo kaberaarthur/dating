@@ -284,8 +284,13 @@ router.post('/token', async (req, res) => {
 
 // Logout endpoint
 // Delete the access token on the browser as well - manually
-router.post('/logout', async (req, res) => {
-    const { token } = req.body; // Refresh token sent in the request body
+router.post('/logout', authenticateToken, async (req, res) => {
+    const { token } = req.body;
+    const user_id = req.user.id;
+
+    // console.log(token);
+    // console.log(user_id);
+
     if (!token) return res.status(400).json({ error: 'Refresh token is required' });
 
     try {
@@ -294,7 +299,7 @@ router.post('/logout', async (req, res) => {
 
         // Invalidate the refresh token in the database
         const [result] = await db.execute('UPDATE users SET refresh_token = NULL WHERE id = ? AND refresh_token = ?', [
-            user.id,
+            user_id,
             token,
         ]);
 
