@@ -67,6 +67,73 @@ router.get("/my-profile", authenticateToken, async (req, res) => {
 });
 
 // Get all user profiles with optional name filter
+router.get("/the-profiles", authenticateToken, async (req, res) => {
+    try {
+        const { name } = req.query; // Get optional name filter from query parameters
+        
+        let query = `
+            SELECT 
+                up.id, 
+                up.user_id, 
+                up.name, 
+                up.created_at, 
+                up.profile_picture, 
+                up.images_updated, 
+                up.details_updated, 
+                up.county, 
+                up.town, 
+                up.date_of_birth, 
+                up.gender, 
+                up.interests, 
+                up.bio, 
+                up.reason, 
+                up.height, 
+                up.fitness, 
+                up.education, 
+                up.career, 
+                up.religion, 
+                u.last_login, 
+                u.active, 
+                u.phone, 
+                u.email, 
+                u.user_type
+            FROM user_profiles up
+            JOIN users u ON up.user_id = u.id
+        `;
+        
+        let queryParams = [];
+        
+        // Add name filter if provided
+        if (name) {
+            query += ` WHERE up.name LIKE ?`;
+            queryParams.push(`%${name}%`);
+        }
+        
+        const [profiles] = await db.execute(query, queryParams);
+        
+        if (profiles.length === 0) {
+            return res.status(404).json({ error: "No profiles found" });
+        }
+        
+        // Get images for each profile
+        for (const profile of profiles) {
+            const [imageRows] = await db.execute(
+                `SELECT * FROM user_images WHERE user_id = ?`,
+                [profile.user_id]
+            );
+            
+            // Add images to the profile object
+            profile.images = imageRows;
+        }
+        
+        res.status(200).json(profiles); // Return all matching profiles with their images
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Get all user profiles with optional name filter
 router.get("/", authenticateToken, async (req, res) => {
     const { name } = req.query; // Get the 'name' query parameter
 
