@@ -66,11 +66,26 @@ router.get("/my-profile", authenticateToken, async (req, res) => {
     }
 });
 
-// Get all user profiles with optional name filter
 router.get("/the-profiles", authenticateToken, async (req, res) => {
+    const user_id = req.user.id; // Current user's ID from the authentication token
+    
     try {
-        const { name } = req.query; // Get optional name filter from query parameters
+        const { name } = req.query;
         
+        // Step 1: Fetch the current user's gender
+        const [userProfile] = await db.execute(
+            `SELECT gender FROM user_profiles WHERE user_id = ?`,
+            [user_id]
+        );
+        
+        if (!userProfile || userProfile.length === 0) {
+            return res.status(404).json({ error: "User profile not found" });
+        }
+
+        const userGender = userProfile[0].gender; // e.g., "male" or "female"
+        const oppositeGender = userGender === "male" ? "female" : "male"; // Determine opposite gender
+
+        // Step 2: Build the query to get profiles of the opposite gender
         let query = `
             SELECT 
                 up.id, 
@@ -99,23 +114,23 @@ router.get("/the-profiles", authenticateToken, async (req, res) => {
                 u.user_type
             FROM user_profiles up
             JOIN users u ON up.user_id = u.id
-        `;
+            WHERE up.gender = ? AND up.user_id != ?`; // Filter by opposite gender and exclude current user
         
-        let queryParams = [];
+        let queryParams = [oppositeGender, user_id]; // Parameters for gender and user_id exclusion
         
         // Add name filter if provided
         if (name) {
-            query += ` WHERE up.name LIKE ?`;
+            query += ` AND up.name LIKE ?`;
             queryParams.push(`%${name}%`);
         }
         
         const [profiles] = await db.execute(query, queryParams);
         
         if (profiles.length === 0) {
-            return res.status(404).json({ error: "No profiles found" });
+            return res.status(404).json({ error: "No profiles of the opposite gender found" });
         }
         
-        // Get images for each profile
+        // Step 3: Get images for each profile
         for (const profile of profiles) {
             const [imageRows] = await db.execute(
                 `SELECT * FROM user_images WHERE user_id = ?`,
@@ -126,12 +141,13 @@ router.get("/the-profiles", authenticateToken, async (req, res) => {
             profile.images = imageRows;
         }
         
-        res.status(200).json(profiles); // Return all matching profiles with their images
+        res.status(200).json(profiles); // Return filtered profiles with their images
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Server error" });
     }
 });
+
 
 // Get all user profiles with optional name filter
 router.get("/", authenticateToken, async (req, res) => {
