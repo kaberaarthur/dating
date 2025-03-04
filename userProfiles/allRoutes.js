@@ -14,12 +14,39 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     try {
-        const [result] = await db.execute(
+        // Start a transaction to ensure both inserts succeed or fail together
+        await db.execute('START TRANSACTION');
+
+        // Insert into user_profiles
+        const [profileResult] = await db.execute(
             'INSERT INTO user_profiles (user_id, name, date_of_birth, gender, bio, reason, interests, county, town) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [user_id, name, date_of_birth, gender, bio, reason, JSON.stringify(interests), county, town]
         );
-        res.status(201).json({ id: result.insertId, name, date_of_birth, gender, bio, reason, interests, county, town });
+
+        // Insert into superlikes_record with amount = 0
+        await db.execute(
+            'INSERT INTO superlikes_record (user_id, amount) VALUES (?, ?)',
+            [user_id, 0]
+        );
+
+        // Commit the transaction
+        await db.execute('COMMIT');
+
+        // Respond with the created profile details
+        res.status(201).json({
+            id: profileResult.insertId,
+            name,
+            date_of_birth,
+            gender,
+            bio,
+            reason,
+            interests,
+            county,
+            town
+        });
     } catch (error) {
+        // Roll back the transaction on error
+        await db.execute('ROLLBACK');
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
