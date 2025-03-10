@@ -8,7 +8,7 @@ require('dotenv').config();
 
 // Access the authorization token
 const authorizationToken = process.env.PAYHERO_AUTHORIZATION_TOKEN;
-const channelID = process.env.PAYHERO_CHANNEL_ID;
+const channelID = 1466;
 const callback_url = process.env.CALLBACK_URL;
 
 

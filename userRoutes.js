@@ -288,8 +288,8 @@ router.post('/logout', authenticateToken, async (req, res) => {
     const { token } = req.body;
     const user_id = req.user.id;
 
-    // console.log(token);
-    // console.log(user_id);
+    console.log(token);
+    console.log(user_id);
 
     if (!token) return res.status(400).json({ error: 'Refresh token is required' });
 
