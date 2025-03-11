@@ -14,9 +14,6 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Start a transaction to ensure both inserts succeed or fail together
-        await db.execute('START TRANSACTION');
-
         // Insert into user_profiles
         const [profileResult] = await db.execute(
             'INSERT INTO user_profiles (user_id, name, date_of_birth, gender, bio, reason, interests, county, town) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -28,9 +25,6 @@ router.post('/', authenticateToken, async (req, res) => {
             'INSERT INTO superlikes_record (user_id, amount) VALUES (?, ?)',
             [user_id, 0]
         );
-
-        // Commit the transaction
-        await db.execute('COMMIT');
 
         // Respond with the created profile details
         res.status(201).json({
@@ -45,12 +39,11 @@ router.post('/', authenticateToken, async (req, res) => {
             town
         });
     } catch (error) {
-        // Roll back the transaction on error
-        await db.execute('ROLLBACK');
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
 });
+
 
 // Get all user profiles with optional name filter
 router.get("/my-profile", authenticateToken, async (req, res) => {
