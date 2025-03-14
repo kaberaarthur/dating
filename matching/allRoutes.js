@@ -4,16 +4,28 @@ const authenticateToken = require('../customMiddleware'); // Token-based authent
 
 const router = express.Router();
 
+// Endpoint to decode contents of the Token
+router.post('/decode', authenticateToken, async (req, res) => {
+    console.log('Authorization Header:', req.headers.authorization);
+    
+    res.status(200).json({ decoded: req.user });
+});
+
+
 // CREATE or UPDATE a match
 router.post('/', authenticateToken, async (req, res) => {
     const { matched_user_id, compatibility_score, is_liked } = req.body;
+    console.log('Authorization Header:', req.headers.authorization);
 
     if (!req.user || !req.user.id) {
         return res.status(400).json({ error: 'User ID is missing in token.' });
     }
 
+    console.log("Decoded User: ", req.user)
+
     const user_id = req.user.id; // Extract user_id from the token
-    console.log("User ID", user_id);
+    console.log("The Liker", user_id);
+    console.log("The Liked One", matched_user_id);
 
     if (!matched_user_id) {
         return res.status(400).json({ error: 'matched_user_id is required.' });
@@ -29,6 +41,7 @@ router.post('/', authenticateToken, async (req, res) => {
         );
 
         if (existingMatch.length > 0) {
+            console.log("A match already exists between these two users")
             // If a match exists, update the matched_date field
             await db.execute(
                 `UPDATE matching 
@@ -84,6 +97,7 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
     }
 
     const user_id = req.user.id;
+    console.log("My Likes UserID: ", user_id)
 
     const filters = ['m.matched_user_id = ?', 'm.is_mutual = 0']; // Change filter to use m.user_id
     const values = [user_id];
@@ -105,17 +119,22 @@ router.get('/mylikes', authenticateToken, async (req, res) => {
                 m.is_liked,
                 m.is_mutual,
                 m.matched_date,
-                u.name AS user_name, -- Retrieve based on m.user_id
+                u.name AS user_name,
                 u.date_of_birth,
                 u.reason,
                 u.interests,
-                u.profile_picture
-             FROM 
+                ui.image_url AS profile_picture  -- Get profile picture from user_images
+            FROM 
                 matching m
-             JOIN 
+            JOIN 
                 user_profiles u ON m.user_id = u.user_id
-             ${whereClause}
-             ORDER BY m.matched_date DESC`,
+            LEFT JOIN 
+                user_images ui ON u.user_id = ui.user_id AND ui.is_profile_picture = 1  -- Ensure only profile picture is fetched
+            ${whereClause}
+            ORDER BY 
+                m.matched_date DESC
+            LIMIT ${limit} OFFSET ${offset};
+            `,
             values
         );
 
