@@ -170,6 +170,75 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+router.get('/messages-limit', authenticateToken, async (req, res) => {
+  const user_id = req.user.id;
+  const currentDate = new Date(); // Current date: March 15, 2025 based on system date
+
+  try {
+      // Get subscription information
+      const [subscriptionRows] = await db.execute(
+          'SELECT end_date FROM subscriptions WHERE user_id = ?',
+          [user_id]
+      );
+
+      // Get user profile information
+      const [profileRows] = await db.execute(
+          'SELECT gender, created_at FROM user_profiles WHERE user_id = ?',
+          [user_id]
+      );
+
+      // If no profile exists, return error
+      if (!profileRows.length) {
+          return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      const { gender, created_at } = profileRows[0];
+      const accountCreationDate = new Date(created_at);
+      const daysSinceCreation = Math.floor(
+          (currentDate - accountCreationDate) / (1000 * 60 * 60 * 24)
+      );
+
+      let messageLimit = 0;
+      const hasActiveSubscription = subscriptionRows.length > 0 && 
+          new Date(subscriptionRows[0].end_date) > currentDate;
+
+      if (hasActiveSubscription) {
+          // Active subscription: unlimited messages for both genders
+          messageLimit = 1000000;
+      } else {
+          // No active subscription
+          if (gender === 'female') {
+              // Females: 50 messages for first 5 days, then 0
+              if (daysSinceCreation <= 5) {
+                  messageLimit = 50;
+              } else {
+                  messageLimit = 0;
+              }
+          } else if (gender === 'male') {
+              // Males: 30 messages for first day, then 0
+              if (daysSinceCreation <= 1) {
+                  messageLimit = 30;
+              } else {
+                  messageLimit = 0;
+              }
+          } else {
+              // Unknown gender: default to 0
+              messageLimit = 0;
+          }
+      }
+
+      res.status(200).json({
+          messageLimit,
+          hasActiveSubscription,
+          daysSinceCreation,
+          gender
+      });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 // DELETE a message
 router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
