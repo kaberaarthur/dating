@@ -187,6 +187,13 @@ router.get('/messages-limit', authenticateToken, async (req, res) => {
           [user_id]
       );
 
+      // Get count of messages sent (more efficient than selecting all columns)
+      const [messagesSentResult] = await db.execute(
+          'SELECT COUNT(*) as sentCount FROM messages WHERE sender_id = ?',
+          [user_id]
+      );
+      const messagesSent = messagesSentResult[0].sentCount;
+
       // If no profile exists, return error
       if (!profileRows.length) {
           return res.status(404).json({ error: 'User profile not found' });
@@ -198,37 +205,41 @@ router.get('/messages-limit', authenticateToken, async (req, res) => {
           (currentDate - accountCreationDate) / (1000 * 60 * 60 * 24)
       );
 
-      let messageLimit = 0;
+      let baseMessageLimit = 0;
       const hasActiveSubscription = subscriptionRows.length > 0 && 
           new Date(subscriptionRows[0].end_date) > currentDate;
 
       if (hasActiveSubscription) {
           // Active subscription: unlimited messages for both genders
-          messageLimit = 1000000;
+          baseMessageLimit = 1000000;
       } else {
           // No active subscription
           if (gender === 'female') {
               // Females: 50 messages for first 5 days, then 0
               if (daysSinceCreation <= 5) {
-                  messageLimit = 50;
+                  baseMessageLimit = 50;
               } else {
-                  messageLimit = 0;
+                  baseMessageLimit = 0;
               }
           } else if (gender === 'male') {
               // Males: 30 messages for first day, then 0
               if (daysSinceCreation <= 1) {
-                  messageLimit = 30;
+                  baseMessageLimit = 30;
               } else {
-                  messageLimit = 0;
+                  baseMessageLimit = 0;
               }
           } else {
               // Unknown gender: default to 0
-              messageLimit = 0;
+              baseMessageLimit = 0;
           }
       }
 
+      // Calculate remaining messages by subtracting sent messages
+      const remainingMessageLimit = Math.max(0, baseMessageLimit - messagesSent);
+
       res.status(200).json({
-          messageLimit,
+          messageLimit: remainingMessageLimit,  // Now represents remaining messages
+          messagesSent: messagesSent,           // Added for frontend info
           hasActiveSubscription,
           daysSinceCreation,
           gender
