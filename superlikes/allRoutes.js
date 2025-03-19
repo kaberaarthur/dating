@@ -80,7 +80,7 @@ router.post("/send", authenticateToken, async (req, res) => {
 
 router.post("/buy", authenticateToken, async (req, res) => {
     const { id } = req.user; // Extract user ID from token
-    const { amount } = req.body;
+    const { amount, phone } = req.body;
 
     if (!id || !amount) {
         return res.status(400).json({ error: "All fields are required." });
@@ -106,7 +106,7 @@ router.post("/buy", authenticateToken, async (req, res) => {
 
         const paymentData = {
             "amount": Number(amount) * 1,
-            "phone_number": userProfile.phone,
+            "phone_number": phone,
             "channel_id": channelID, 
             "provider": "m-pesa", 
             "external_reference": "INV-009",
